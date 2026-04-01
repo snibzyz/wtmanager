@@ -1,0 +1,12 @@
+"""Color palette - Rabbit Hole: dark + blush/rose pink gradient."""
+
+PINK = "#E37F9D"
+PINK_LIGHT = "#F4BECF"
+PINK_DARK = "#C75A7A"
+PINK_SOFT = "#E8A0B8"
+BLACK = "#0F0F0F"
+CARD_BG = "#1A1A1A"
+CARD_BORDER = "#2D2D2D"
+TEXT_MUTED = "#9CA3AF"
+TEXT_WHITE = "#FFFFFF"
+SUCCESS = "#10B981"
