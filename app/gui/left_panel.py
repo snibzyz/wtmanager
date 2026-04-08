@@ -4,6 +4,7 @@ import flet as ft
 
 from app.gui.styles import STORY_SELECTED, STORY_UNSELECTED
 from app.theme import CARD_BG, CARD_BORDER, PINK, PINK_SOFT, TEXT_MUTED, TEXT_WHITE, opacity
+from app.paths import canonical_dir
 from app.workspace import get_last_workspace, get_workspace_subfolders, set_last_workspace
 
 
@@ -32,11 +33,12 @@ def build_left_panel(
             btn.style = STORY_SELECTED if path in sel else STORY_UNSELECTED
 
     def _apply_folder(path: str) -> None:
-        if not path:
+        norm = canonical_dir(path)
+        if not norm:
             return
-        parent_path_ref["value"] = path
-        set_last_workspace(path)
-        parent_label.value = path
+        parent_path_ref["value"] = norm
+        set_last_workspace(norm)
+        parent_label.value = norm
         parent_label.color = TEXT_WHITE
 
         stories = get_workspace_subfolders(path)

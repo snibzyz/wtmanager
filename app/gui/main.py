@@ -17,6 +17,7 @@ def main(page: ft.Page) -> None:
     page.window.height = 720
     page.window.min_width = 900
     page.window.min_height = 600
+    page.window.maximized = True
     page.padding = 16
     page.bgcolor = BLACK
 
@@ -28,10 +29,11 @@ def main(page: ft.Page) -> None:
     story_buttons: dict[str, ft.FilledTonalButton] = {}
     selected_funcs: set[str] = set(cfg.get("selected_functions", []))
 
-    # Pickers
+    # Pickers + clipboard (Flet 0.80+ ไม่รองรับ page.clipboard = ...)
     dir_picker = ft.FilePicker()
     file_picker = ft.FilePicker()
-    page.services.extend([dir_picker, file_picker])
+    clipboard_svc = ft.Clipboard()
+    page.services.extend([dir_picker, file_picker, clipboard_svc])
 
     # Build components
     header = build_header()
@@ -39,7 +41,12 @@ def main(page: ft.Page) -> None:
         page, dir_picker, parent_path_ref, selected_paths_ref, story_buttons
     )
     right_panel = build_right_panel(
-        page, file_picker, selected_funcs, parent_path_ref, selected_paths_ref
+        page,
+        file_picker,
+        selected_funcs,
+        parent_path_ref,
+        selected_paths_ref,
+        clipboard_svc=clipboard_svc,
     )
 
     # Assemble

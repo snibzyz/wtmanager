@@ -1,6 +1,6 @@
 """Right panel: Function toggles + Settings + Output preview + Execute."""
 
-import threading
+import asyncio
 from pathlib import Path
 from typing import Callable
 
@@ -8,6 +8,7 @@ import flet as ft
 
 from app.collectors.credit import default_credit_path
 from app.config import load_config, save_config
+from app.paths import canonical_file
 from app.gui.constants import FUNC_ICONS, FUNC_LABELS, FUNC_ORDER, build_folder_name
 from app.gui.styles import chip_disabled, chip_off, chip_on, fmt_style
 from app.theme import (
@@ -16,12 +17,17 @@ from app.theme import (
 )
 
 
+# อัปเดต UI เป็นชุดๆ ลดภาระเครื่องอ่อน (ลด page.update ต่อบรรทัด log)
+_UI_LOG_BATCH = 8
+
+
 def build_right_panel(
     page: ft.Page,
     file_picker: ft.FilePicker,
     selected_funcs: set[str],
     parent_path_ref: dict,
     selected_paths_ref: dict,
+    clipboard_svc: ft.Clipboard | None = None,
 ) -> ft.Container:
 
     cfg = load_config()
@@ -33,9 +39,9 @@ def build_right_panel(
     default_cred = default_credit_path()
     if not saved_credit_paths and Path(default_cred).exists():
         saved_credit_paths = [default_cred]
-    # เก็บรายการใน dict เพื่อให้ closure แก้ค่าได้
+    # เก็บ path แบบ absolute ที่ resolve แล้ว ให้ทุกเครื่องอ่านโฟลเดอร์เดียวกันได้ชัดเจน
     credit_paths_ref: dict[str, list[str]] = {
-        "value": [p for p in saved_credit_paths if Path(p).exists()]
+        "value": [c for p in saved_credit_paths if (c := canonical_file(p))]
     }
 
     # ListView แสดงรายการไฟล์ที่เลือก (แต่ละแถว = 1 ไฟล์ + ปุ่มลบ)
@@ -98,9 +104,14 @@ def build_right_panel(
         if result and result.files:
             existing = set(credit_paths_ref["value"])
             for f in result.files:
-                if f.path and f.path not in existing:
-                    credit_paths_ref["value"].append(f.path)
-                    existing.add(f.path)
+                if not f.path:
+                    continue
+                c = canonical_file(f.path)
+                if not c:
+                    continue
+                if c not in existing:
+                    credit_paths_ref["value"].append(c)
+                    existing.add(c)
             _save_cfg()
             _rebuild_credit_list()
             page.update()
@@ -288,10 +299,17 @@ def build_right_panel(
         auto_scroll=True, expand=True,
     )
 
-    def _copy_log(e: ft.ControlEvent) -> None:
+    async def _copy_log(e: ft.ControlEvent) -> None:
         lines = [c.value for c in _log_list.controls if hasattr(c, "value")]
-        page.clipboard = "\n".join(lines)
-        _toast("คัดลอก log แล้ว")
+        text = "\n".join(lines)
+        if clipboard_svc is not None:
+            try:
+                await clipboard_svc.set(text)
+                _toast("คัดลอก log แล้ว")
+                return
+            except Exception:
+                pass
+        _toast("คัดลอกไม่สำเร็จ (clipboard)", error=True)
 
     _copy_btn = ft.IconButton(
         ft.Icons.COPY_ALL_OUTLINED, tooltip="คัดลอก log ทั้งหมด",
@@ -331,6 +349,11 @@ def build_right_panel(
     )
 
     _progress_state: dict = {"total": 0, "done": 0}
+    _log_batch_count: dict = {"n": 0}
+
+    def _flush_progress_ui() -> None:
+        page.update()
+        _log_batch_count["n"] = 0
 
     def _progress_reset(total_files: int) -> None:
         _progress_state["total"] = total_files
@@ -338,9 +361,15 @@ def build_right_panel(
         _progress_bar.value = 0
         _progress_label.value = ""
         _log_list.controls.clear()
+        _log_batch_count["n"] = 0
         page.update()
 
-    def _progress_log(msg: str, color: str = TEXT_MUTED, advance: bool = False) -> None:
+    def _progress_log(
+        msg: str,
+        color: str = TEXT_MUTED,
+        advance: bool = False,
+        flush: bool = False,
+    ) -> None:
         if advance:
             _progress_state["done"] += 1
             done = _progress_state["done"]
@@ -350,22 +379,38 @@ def build_right_panel(
         _log_list.controls.append(
             ft.Text(msg, size=11, color=color, selectable=True, no_wrap=False)
         )
-        page.update()
+        if flush:
+            _flush_progress_ui()
+        else:
+            _log_batch_count["n"] += 1
+            if _log_batch_count["n"] >= _UI_LOG_BATCH:
+                _flush_progress_ui()
 
     def _progress_done() -> None:
         _progress_bar.value = 1
-        page.update()
+        _flush_progress_ui()
 
     # ── Toast ────────────────────────────────────────────────────────────
-    _snackbar = ft.SnackBar(content=ft.Text(""), duration=4000, bgcolor=CARD_BG)
+    _snackbar = ft.SnackBar(content=ft.Text(""), duration=4500, bgcolor=CARD_BG)
     page.overlay.append(_snackbar)
 
-    def _toast(msg: str, error: bool = False) -> None:
+    def _toast(msg: str, error: bool = False, long_duration: bool = False) -> None:
         icon = ft.Icons.ERROR_OUTLINE if error else ft.Icons.CHECK_CIRCLE_OUTLINE
         color = "#EF4444" if error else SUCCESS
+        _snackbar.duration = 11000 if long_duration and not error else (7000 if error else 4500)
         _snackbar.content = ft.Row(
-            [ft.Icon(icon, color=color, size=20), ft.Text(msg, color=TEXT_WHITE, size=13)],
+            [
+                ft.Icon(icon, color=color, size=20),
+                ft.Text(
+                    msg,
+                    color=TEXT_WHITE,
+                    size=13,
+                    no_wrap=False,
+                    max_lines=8,
+                ),
+            ],
             spacing=10,
+            vertical_alignment=ft.CrossAxisAlignment.START,
         )
         _snackbar.bgcolor = CARD_BG
         _snackbar.open = True
@@ -383,15 +428,16 @@ def build_right_panel(
         height=48, icon=ft.Icons.PLAY_ARROW,
     )
 
-    def _do_execute(
+    async def _do_execute_async(
         selected_stories: list,
         funcs: set,
         folder_name: str,
-        cred_path: list[str] | None,  # รับ list ของ paths
+        cred_path: list[str] | None,
         comp_fmt: str,
         comp_q: int,
         parts: int,
     ) -> None:
+        """รันงานหนักใน thread pool — อัปเดต UI บน event loop ของ Flet เท่านั้น."""
         from app.collectors.compress import apply_compress
         from app.collectors.credit import apply_credit
         from app.collectors.split import apply_split
@@ -401,100 +447,195 @@ def build_right_panel(
         from app.collectors.text import collect_text
         from app.collectors.trans import collect_trans
 
+        loop = asyncio.get_running_loop()
         ok_count = 0
         err_msg = None
+        agg = {
+            "split_pieces": 0,
+            "split_eps": 0,
+            "cred_templates": 0,
+            "cred_eps": 0,
+            "cred_files_total": 0,
+        }
+
+        def _ui_threadsafe(fn) -> None:
+            loop.call_soon_threadsafe(fn)
+
+        def _color_collect_line(line: str, phase_ok: bool) -> str:
+            s = line.strip()
+            if not phase_ok:
+                return "#EF4444"
+            if "ผิดพลาด" in line or ("ไม่พบ" in line and "✓" not in s):
+                return "#EF4444"
+            if s.startswith("✓"):
+                return SUCCESS
+            return TEXT_MUTED
+
+        def _color_split_line(line: str, phase_ok: bool) -> str:
+            s = line.strip()
+            if not phase_ok or "ไม่ได้:" in line or "⊗" in line:
+                return "#EF4444"
+            if s.startswith("⚠"):
+                return "#F59E0B"
+            if s.startswith("−"):
+                return TEXT_MUTED
+            if (
+                s.startswith("✓")
+                or "หั่นภาพเสร็จ" in s
+                or "หั่นภาพเสร็จแล้ว" in s
+            ):
+                return SUCCESS
+            if s.startswith("ตอน [") or "แบ่งเป็น" in s:
+                return PINK_LIGHT
+            return TEXT_MUTED
+
+        def _color_credit_line(line: str, phase_ok: bool) -> str:
+            s = line.strip()
+            if not phase_ok or "ผิดพลาด" in line:
+                return "#EF4444"
+            if "เสร็จ" in s and "เครดิต" in s:
+                return SUCCESS
+            if s.startswith("เครดิต") or s.startswith("  •"):
+                return PINK_LIGHT
+            return TEXT_MUTED
+
+        async def _show_lines(lines: list[str], phase_ok: bool, color_fn: Callable[[str, bool], str]) -> None:
+            for i, l in enumerate(lines):
+                _progress_log(f"    {l}", color=color_fn(l, phase_ok), flush=False)
+                if i % 10 == 9:
+                    await asyncio.sleep(0)
+            _flush_progress_ui()
 
         try:
             for story_idx, base_path in enumerate(selected_stories):
                 story_name = Path(base_path).name
                 story_ok = True
 
-                _progress_log(f"── {story_name} ({story_idx+1}/{len(selected_stories)}) ──",
-                              color=PINK_LIGHT)
+                _progress_log(
+                    f"── {story_name} ({story_idx+1}/{len(selected_stories)}) ──",
+                    color=PINK_LIGHT,
+                    flush=True,
+                )
 
-                # Phase 1: collect base files
                 if "raw" in funcs:
-                    _progress_log("  ดึงไฟล์ดิบ (raw)...", color=TEXT_MUTED)
-                    ok, logs = collect_raw(base_path, folder_name)
-                    for l in logs:
-                        _progress_log(f"    {l}", color=TEXT_MUTED)
+                    _progress_log("  ดึงไฟล์ดิบ (raw)...", color=TEXT_MUTED, flush=True)
+                    ok, logs = await asyncio.to_thread(collect_raw, base_path, folder_name)
+                    await _show_lines(logs, ok, _color_collect_line)
                     if not ok:
                         story_ok = False
 
                 if "inp" in funcs:
-                    _progress_log("  ดึงไฟล์คลีน (inp)...", color=TEXT_MUTED)
-                    ok, logs = collect_inpainted(base_path, folder_name)
-                    for l in logs:
-                        _progress_log(f"    {l}", color=TEXT_MUTED)
+                    _progress_log("  ดึงไฟล์คลีน (inp)...", color=TEXT_MUTED, flush=True)
+                    ok, logs = await asyncio.to_thread(
+                        collect_inpainted, base_path, folder_name
+                    )
+                    await _show_lines(logs, ok, _color_collect_line)
                     if not ok:
                         story_ok = False
 
                 if "res" in funcs:
-                    _progress_log("  ดึงไฟล์ลงคำ (res)...", color=TEXT_MUTED)
-                    ok, logs = collect_res(base_path, folder_name)
-                    for l in logs:
-                        _progress_log(f"    {l}", color=TEXT_MUTED)
+                    _progress_log("  ดึงไฟล์ลงคำ (res)...", color=TEXT_MUTED, flush=True)
+                    ok, logs = await asyncio.to_thread(collect_res, base_path, folder_name)
+                    await _show_lines(logs, ok, _color_collect_line)
                     if not ok:
                         story_ok = False
 
                 if "trans" in funcs:
-                    _progress_log("  ดึงไฟล์แปล (trans)...", color=TEXT_MUTED)
-                    ok, logs = collect_trans(base_path, folder_name, per_episode="ep" in funcs)
-                    for l in logs:
-                        _progress_log(f"    {l}", color=TEXT_MUTED)
+                    _progress_log("  ดึงไฟล์แปล (trans)...", color=TEXT_MUTED, flush=True)
+                    ok, logs = await asyncio.to_thread(
+                        collect_trans, base_path, folder_name, "ep" in funcs
+                    )
+                    await _show_lines(logs, ok, _color_collect_line)
                     if not ok:
                         story_ok = False
 
                 if "text" in funcs:
-                    _progress_log("  ดึงไฟล์ถอดคำ (text)...", color=TEXT_MUTED)
-                    ok, logs = collect_text(base_path, folder_name, per_episode="ep" in funcs)
-                    for l in logs:
-                        _progress_log(f"    {l}", color=TEXT_MUTED)
+                    _progress_log("  ดึงไฟล์ถอดคำ (text)...", color=TEXT_MUTED, flush=True)
+                    ok, logs = await asyncio.to_thread(
+                        collect_text, base_path, folder_name, "ep" in funcs
+                    )
+                    await _show_lines(logs, ok, _color_collect_line)
                     if not ok:
                         story_ok = False
 
-                # Phase 2: post-processing
                 if "split" in funcs:
-                    _progress_log("  หั่นภาพ (split)...", color=TEXT_MUTED)
-                    apply_split(base_path, folder_name, parts=parts)
+                    _progress_log("  หั่นภาพ (split)...", color=TEXT_MUTED, flush=True)
+
+                    def _split_live_log(msg: str) -> None:
+                        def _u() -> None:
+                            col = _color_split_line(msg, True)
+                            if "ผิดพลาด" in msg or "ไม่พบ" in msg:
+                                col = "#EF4444"
+                            elif msg.strip().startswith("⚠"):
+                                col = "#F59E0B"
+                            elif msg.strip().startswith("−"):
+                                col = TEXT_MUTED
+                            _progress_log(f"    {msg}", color=col, flush=False)
+
+                        loop.call_soon_threadsafe(_u)
+
+                    ok, logs, st = await asyncio.to_thread(
+                        apply_split, base_path, folder_name, parts, _split_live_log
+                    )
+                    agg["split_pieces"] += int(st.get("total_pieces", 0))
+                    agg["split_eps"] += int(st.get("episodes_done", 0))
+                    _flush_progress_ui()
+                    if not ok:
+                        story_ok = False
 
                 if "cred" in funcs and cred_path:
                     n = len(cred_path)
-                    _progress_log(f"  เพิ่มเครดิต {n} ไฟล์ (cred)...", color=TEXT_MUTED)
-                    ok, logs = apply_credit(base_path, folder_name, cred_path)
-                    for l in logs:
-                        _progress_log(f"    {l}", color=TEXT_MUTED)
+                    _progress_log(f"  เพิ่มเครดิต {n} แบบ (cred)...", color=TEXT_MUTED, flush=True)
+                    ok, logs, cst = await asyncio.to_thread(
+                        apply_credit, base_path, folder_name, cred_path
+                    )
+                    agg["cred_templates"] = max(agg["cred_templates"], int(cst.get("templates", n)))
+                    agg["cred_eps"] += int(cst.get("episodes", 0))
+                    agg["cred_files_total"] += int(cst.get("files_copied_total", 0))
+                    await _show_lines(logs, ok, _color_credit_line)
                     if not ok:
                         story_ok = False
 
                 if "com" in funcs:
-                    _progress_log("  ย่อไฟล์ (com)...", color=PINK_LIGHT)
+                    _progress_log("  ย่อไฟล์ (com)...", color=PINK_LIGHT, flush=True)
 
                     def _com_log(msg: str) -> None:
-                        stripped = msg.strip()
-                        color = SUCCESS if stripped.startswith("✓") else TEXT_MUTED
-                        _progress_log(f"    {msg}", color=color)
+                        def _apply_log() -> None:
+                            stripped = msg.strip()
+                            color = SUCCESS if stripped.startswith("✓") else TEXT_MUTED
+                            _progress_log(f"    {msg}", color=color, flush=False)
+
+                        _ui_threadsafe(_apply_log)
 
                     def _com_progress(done: int, total: int, filename: str) -> None:
-                        _progress_state["total"] = total
-                        _progress_state["done"] = done
-                        _progress_bar.value = done / total if total else 0
-                        _progress_label.value = f"{done} / {total}  ({filename})"
-                        page.update()
+                        def _apply_prog() -> None:
+                            _progress_state["total"] = total
+                            _progress_state["done"] = done
+                            _progress_bar.value = done / total if total else 0
+                            _progress_label.value = f"{done} / {total}  ({filename})"
+                            page.update()
 
-                    apply_compress(base_path, folder_name, comp_fmt, comp_q,
-                                   log_callback=_com_log,
-                                   progress_callback=_com_progress)
+                        _ui_threadsafe(_apply_prog)
+
+                    await asyncio.to_thread(
+                        apply_compress,
+                        base_path,
+                        folder_name,
+                        comp_fmt,
+                        comp_q,
+                        log_callback=_com_log,
+                        progress_callback=_com_progress,
+                    )
 
                 if story_ok:
                     ok_count += 1
-                    _progress_log(f"  ✓ {story_name} เสร็จ", color=SUCCESS)
+                    _progress_log(f"  ✓ {story_name} เสร็จ", color=SUCCESS, flush=True)
                 else:
-                    _progress_log(f"  ✗ {story_name} มีข้อผิดพลาด", color="#EF4444")
+                    _progress_log(f"  ✗ {story_name} มีข้อผิดพลาด", color="#EF4444", flush=True)
 
         except Exception as ex:
             err_msg = str(ex)
-            _progress_log(f"ผิดพลาด: {ex}", color="#EF4444")
+            _progress_log(f"ผิดพลาด: {ex}", color="#EF4444", flush=True)
         finally:
             _progress_done()
             btn_execute.disabled = False
@@ -502,7 +643,20 @@ def build_right_panel(
             if err_msg:
                 _toast(f"ผิดพลาด: {err_msg}", error=True)
             else:
-                _toast(f"เสร็จแล้ว {ok_count} เรื่อง → {folder_name}/")
+                summary_lines = [
+                    f"เสร็จ {ok_count}/{len(selected_stories)} เรื่อง → {folder_name}/",
+                ]
+                if "split" in funcs:
+                    summary_lines.append(
+                        f"หั่นรวม {agg['split_pieces']} ไฟล์ ใน {agg['split_eps']} ตอน "
+                        f"(ตั้งหั่น {parts} ชิ้นต่อภาพ)"
+                    )
+                if "cred" in funcs and cred_path:
+                    summary_lines.append(
+                        f"เครดิต {agg['cred_templates']} แบบ × {agg['cred_eps']} ตอน "
+                        f"(คัดลอกรวม {agg['cred_files_total']} ไฟล์)"
+                    )
+                _toast("\n".join(summary_lines), long_duration=True)
             page.update()
 
     def run_execute(e: ft.ControlEvent) -> None:
@@ -539,11 +693,12 @@ def build_right_panel(
         _progress_reset(0)
         page.update()
 
-        threading.Thread(
-            target=_do_execute,
-            args=(selected_stories, funcs, folder_name, cred_path, comp_fmt, comp_q, parts),
-            daemon=True,
-        ).start()
+        async def _run_job() -> None:
+            await _do_execute_async(
+                selected_stories, funcs, folder_name, cred_path, comp_fmt, comp_q, parts
+            )
+
+        page.run_task(_run_job)
 
     btn_execute.on_click = run_execute
 

@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from app.paths import canonical_dir
+
 _CONFIG_DIR = Path(__file__).resolve().parent
 _CONFIG_FILE = _CONFIG_DIR / "config.json"
 
@@ -46,14 +48,13 @@ def save_config(c: dict) -> None:
 
 def get_last_workspace_from_config() -> str:
     path = load_config().get("last_workspace", "") or ""
-    if path and Path(path).is_dir():
-        return path
-    return ""
+    return canonical_dir(path)
 
 
 def set_last_workspace_in_config(path: str) -> None:
-    if not path or not Path(path).is_dir():
+    norm = canonical_dir(path)
+    if not norm:
         return
     c = load_config()
-    c["last_workspace"] = path
+    c["last_workspace"] = norm
     save_config(c)
