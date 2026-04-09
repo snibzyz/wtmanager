@@ -14,6 +14,7 @@ DEFAULTS = {
     "credit_paths": [],      # รายการไฟล์เครดิต (เลือกได้หลายไฟล์)
     "compress_format": "jpg",
     "compress_quality": 70,
+    "split_parts": 2,        # จำนวนชิ้นต่อภาพเมื่อใช้ split (2–20)
 }
 
 

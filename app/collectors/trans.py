@@ -46,6 +46,13 @@ def collect_trans(
     out_base = base / output_folder
     out_base.mkdir(parents=True, exist_ok=True)
 
+    if not per_episode:
+        names_only = [x[2] for x in to_copy]
+        if len(names_only) > len(set(names_only)):
+            _log(
+                "⚠ โหมดรวมโฟลเดอร์เดียว: มีชื่อไฟล์ซ้ำจากคนละตอน — ไฟล์ที่คัดลอกทีหลังจะทับของเดิม"
+            )
+
     try:
         for ep_name, src, name in sorted(to_copy, key=lambda x: (x[0], x[2])):
             if per_episode:

@@ -4,6 +4,7 @@ import flet as ft
 
 from app.gui.styles import STORY_SELECTED, STORY_UNSELECTED
 from app.theme import CARD_BG, CARD_BORDER, PINK, PINK_SOFT, TEXT_MUTED, TEXT_WHITE, opacity
+from app.gui.page_utils import safe_page_update
 from app.paths import canonical_dir
 from app.workspace import get_last_workspace, get_workspace_subfolders, set_last_workspace
 
@@ -66,13 +67,13 @@ def build_left_panel(
                         else:
                             selected_paths_ref["value"].add(fp)
                         _update_story_styles()
-                        page.update()
+                        safe_page_update(page)
                     return click
 
                 btn.on_click = make_click(full_path)
                 story_buttons[full_path] = btn
                 stories_wrap.controls.append(btn)
-        page.update()
+        safe_page_update(page)
 
     last = get_last_workspace()
     if last:
@@ -90,12 +91,12 @@ def build_left_panel(
     def select_all(e: ft.ControlEvent) -> None:
         selected_paths_ref["value"] = set(story_buttons.keys())
         _update_story_styles()
-        page.update()
+        safe_page_update(page)
 
     def clear_all(e: ft.ControlEvent) -> None:
         selected_paths_ref["value"] = set()
         _update_story_styles()
-        page.update()
+        safe_page_update(page)
 
     workspace_row = ft.Row(
         [

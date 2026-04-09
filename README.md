@@ -220,3 +220,4 @@ WTManager/
 | `credit_paths` | list | รายการไฟล์เครดิต |
 | `compress_format` | string | `jpg` หรือ `png` |
 | `compress_quality` | int | คุณภาพ compress 1–100 |
+| `split_parts` | int | จำนวนชิ้นต่อภาพเมื่อใช้ split (2–20, default 2) |

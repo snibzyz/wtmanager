@@ -26,14 +26,15 @@ def _compress_file(
     dest: Path,
     fmt: str,
     quality: int,
+    report_error: Callable[[str], None] | None = None,
 ) -> tuple[bool, int, int]:
     """Compress a single image. Returns (success, original_size, compressed_size)."""
     if not HAS_PIL:
         shutil.copy2(src, dest)
         return False, 0, 0
-    
+
     original_size = src.stat().st_size
-    
+
     try:
         img = Image.open(src)
         if img.mode in ("RGBA", "P") and fmt in ("jpg", "jpeg"):
@@ -57,7 +58,9 @@ def _compress_file(
             return False, original_size, original_size
         return True, original_size, compressed_size
     except Exception as e:
-        print(f"Compression error for {src}: {e}")
+        msg = f"ย่อ {src.name} ผิดพลาด: {e}"
+        if report_error:
+            report_error(msg)
         if dest.exists():
             dest.unlink(missing_ok=True)
         return False, original_size, original_size
@@ -152,7 +155,9 @@ def apply_compress(
                 # Show progress with filename
                 _log(f"  [{i}/{len(image_files)}] {progress:.1f}% - กำลังย่อ {f.name}")
                 
-                success, orig_size, comp_size = _compress_file(f, tmp, fmt, quality)
+                success, orig_size, comp_size = _compress_file(
+                    f, tmp, fmt, quality, report_error=_log
+                )
 
                 dest = ep_dir / new_name
                 if success:

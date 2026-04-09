@@ -10,6 +10,7 @@ from app.collectors.credit import default_credit_path
 from app.config import load_config, save_config
 from app.paths import canonical_file
 from app.gui.constants import FUNC_ICONS, FUNC_LABELS, FUNC_ORDER, build_folder_name
+from app.gui.page_utils import safe_page_update
 from app.gui.styles import chip_disabled, chip_off, chip_on, fmt_style
 from app.theme import (
     CARD_BG, CARD_BORDER, PINK, PINK_LIGHT, PINK_SOFT,
@@ -29,15 +30,6 @@ def build_right_panel(
     selected_paths_ref: dict,
     clipboard_svc: ft.Clipboard | None = None,
 ) -> ft.Container:
-
-    def _safe_page_update() -> None:
-        """หลีกเลี่ยง crash ตอนปิดหน้าต่าง / ยกเลิกงาน — session ถูกทำลายแล้วแต่ finally ยังเรียก update."""
-        try:
-            page.update()
-        except RuntimeError as e:
-            if "destroyed session" in str(e).lower():
-                return
-            raise
 
     cfg = load_config()
 
@@ -67,7 +59,7 @@ def build_right_panel(
                     credit_paths_ref["value"].pop(i)
                     _save_cfg()
                     _rebuild_credit_list()
-                    _safe_page_update()
+                    safe_page_update(page)
                 return _remove
             row = ft.Row(
                 [
@@ -104,15 +96,22 @@ def build_right_panel(
 
     async def on_credit_browse(e: ft.ControlEvent) -> None:
         """เปิด file picker เลือกได้หลายไฟล์ แล้วเพิ่มเข้า list (ไม่ซ้ำ)"""
-        result = await file_picker.pick_files(
+        picked = await file_picker.pick_files(
             dialog_title="เลือกไฟล์เครดิต (เลือกได้หลายไฟล์)",
             file_type=ft.FilePickerFileType.CUSTOM,
             allowed_extensions=["png", "jpg", "jpeg"],
             allow_multiple=True,
         )
-        if result and result.files:
+        # Flet 0.80+: pick_files returns list[FilePickerFile]. Older builds used an object with .files.
+        if picked is None:
+            files: list = []
+        elif isinstance(picked, list):
+            files = picked
+        else:
+            files = list(getattr(picked, "files", ()) or ())
+        if files:
             existing = set(credit_paths_ref["value"])
-            for f in result.files:
+            for f in files:
                 if not f.path:
                     continue
                 c = canonical_file(f.path)
@@ -123,7 +122,7 @@ def build_right_panel(
                     existing.add(c)
             _save_cfg()
             _rebuild_credit_list()
-            _safe_page_update()
+            safe_page_update(page)
 
     credit_browse_btn.on_click = on_credit_browse
 
@@ -176,7 +175,7 @@ def build_right_panel(
         btn_jpg.style = fmt_style(fmt == "jpg")
         btn_png.style = fmt_style(fmt == "png")
         _save_cfg()
-        _safe_page_update()
+        safe_page_update(page)
 
     compress_section = ft.Container(
         content=ft.Row(
@@ -282,7 +281,7 @@ def build_right_panel(
                     selected_funcs.discard("raw")
                 selected_funcs.add(key)
             _refresh_func_ui()
-            _safe_page_update()
+            safe_page_update(page)
         return handler
 
     for key in FUNC_ORDER:
@@ -361,7 +360,7 @@ def build_right_panel(
     _log_batch_count: dict = {"n": 0}
 
     def _flush_progress_ui() -> None:
-        _safe_page_update()
+        safe_page_update(page)
         _log_batch_count["n"] = 0
 
     def _progress_reset(total_files: int) -> None:
@@ -371,7 +370,7 @@ def build_right_panel(
         _progress_label.value = ""
         _log_list.controls.clear()
         _log_batch_count["n"] = 0
-        _safe_page_update()
+        safe_page_update(page)
 
     def _progress_log(
         msg: str,
@@ -423,7 +422,7 @@ def build_right_panel(
         )
         _snackbar.bgcolor = CARD_BG
         _snackbar.open = True
-        _safe_page_update()
+        safe_page_update(page)
 
     # ── Execute ──────────────────────────────────────────────────────────
     btn_execute = ft.ElevatedButton(
@@ -623,7 +622,7 @@ def build_right_panel(
                             _progress_state["done"] = done
                             _progress_bar.value = done / total if total else 0
                             _progress_label.value = f"{done} / {total}  ({filename})"
-                            _safe_page_update()
+                            safe_page_update(page)
 
                         _ui_threadsafe(_apply_prog)
 
@@ -654,7 +653,7 @@ def build_right_panel(
             btn_execute.disabled = False
             btn_execute.text = "Execute"
             if cancelled:
-                _safe_page_update()
+                safe_page_update(page)
             elif err_msg:
                 _toast(f"ผิดพลาด: {err_msg}", error=True)
             else:
@@ -686,6 +685,9 @@ def build_right_panel(
         if not funcs & {"raw", "res", "trans", "text"}:
             _toast("กรุณาเลือกอย่างน้อย 1 ฟังก์ชัน (raw/res/trans/text)", error=True)
             return
+        if "cred" in funcs and not credit_paths_ref["value"]:
+            _toast("กรุณาเพิ่มไฟล์เครดิตอย่างน้อย 1 ไฟล์ (หรือปิดฟังก์ชัน cred)", error=True)
+            return
 
         folder_name = build_folder_name(funcs)
         if not folder_name:
@@ -705,7 +707,7 @@ def build_right_panel(
         btn_execute.disabled = True
         btn_execute.text = "กำลังทำงาน..."
         _progress_reset(0)
-        _safe_page_update()
+        safe_page_update(page)
 
         async def _run_job() -> None:
             await _do_execute_async(
