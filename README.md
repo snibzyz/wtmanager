@@ -7,32 +7,57 @@ Workspace collector สำหรับรวบรวมและจัดกา
 
 ## ความต้องการ
 
-- **Python 3.10+**
-- **Flet** >= 0.24.0 (GUI framework)
-- **Pillow** >= 10.0.0 (compress ภาพ)
+- **Python 3.10+** (แนะนำติ๊ก Add to PATH ตอนติดตั้ง)
+- **Git** (สำหรับ clone + auto-update)
+- แพ็กเกจใน `requirements.txt`: **Flet**, **Pillow**, **certifi** (ลดปัญหา SSL บน Windows ตอนโหลด Flet ครั้งแรก)
 
 ---
 
-## ติดตั้ง
+## เริ่มต้น (แนะนำ — clone จาก Git)
 
-ดับเบิลคลิก `install.bat` หรือรันคำสั่ง:
+**ให้โค้ดตรงกับรีโปและมี auto-update** อย่าใช้แค่ดาวน์โหลด ZIP ถ้าไม่จำเป็น
 
+1. ติดตั้ง [Python 3.10+](https://www.python.org/downloads/) และ [Git for Windows](https://git-scm.com/download/win)  
+2. เปิด CMD / PowerShell แล้วรัน (แทน `<URL>` ด้วยลิงก์ clone จริงของรีโป):
+
+```text
+git clone <URL>
+cd <ชื่อโฟลเดอร์โปรเจกต์>
 ```
-python install.py
+
+3. ดับเบิลคลิก **`install.bat`** (หรือจากโฟลเดอร์รีโป: `python scripts\install.py`) — จะติดตั้งแพ็กเกจและ **ทดสอบโหลด Flet ครั้งแรก** ถ้าผ่านถือว่าพร้อมใช้  
+4. ดับเบิลคลิก **`run.bat`** (หรือ `python scripts\run.py`)
+
+ถ้า `install.bat` จบด้วยข้อความ **\[ตรวจสอบ\] พร้อมใช้งาน** แปลว่าติดตั้งสมบูรณ์แล้ว
+
+**หมายเหตุ Windows:** ไฟล์ `*.bat` ที่รากโปรเจกต์ใช้เฉพาะตัวอักษร ASCII และเข้ารหัส UTF-8 พร้อม BOM เพื่อไม่ให้ `cmd.exe` ตีความบรรทัดผิด (อาการ `'...' is not recognized`) เมื่อระบบใช้ code page อื่น ข้อความภาษาไทยอยู่ใน `scripts/*.py`
+
+---
+
+## ติดตั้ง (เมื่อมีโฟลเดอร์โปรเจกต์อยู่แล้ว)
+
+ดับเบิลคลิก `install.bat` หรือรัน:
+
+```text
+python scripts\install.py
 ```
 
 ---
 
 ## เปิดใช้งาน
 
-ดับเบิลคลิก `run.bat` หรือรันคำสั่ง:
+ดับเบิลคลิก `run.bat` หรือรัน:
 
-```
-python run.py
+```text
+python scripts\run.py
 ```
 
-> **Auto-update:** ทุกครั้งที่เปิดโปรแกรม จะดึงอัปเดตล่าสุดจาก GitHub อัตโนมัติ (`git pull`)  
-> ถ้าไม่มีเน็ตหรือ git ไม่ถูก install — ข้ามไปเปิดแอปตามปกติ ไม่ค้าง
+## อัปเดตด้วยมือ
+
+ดับเบิลคลิก **`update.bat`** — จะ `git pull --ff-only` แล้วรัน `scripts\install.py` อีกครั้ง
+
+> **Auto-update:** เมื่อโฟลเดอร์มาจาก `git clone` (มี `.git`) ทุกครั้งที่เปิดโปรแกรมจะ `git pull --ff-only` ก่อน  
+> ถ้าไม่มีเน็ต / ไม่มี git / pull ไม่สำเร็จ — ข้ามไปเปิดแอปได้ ไม่ค้าง
 
 ---
 
@@ -146,11 +171,17 @@ D:\Projects\manga-translate\My Story 001\res_cred_com\
 
 ```
 WTManager/
-├── run.bat / run.py          # เปิดแอป (มี auto-update)
-├── install.bat / install.py  # ติดตั้ง dependencies
+├── install.bat               # ติดตั้ง (เรียก scripts\install.py)
+├── run.bat                   # เปิดแอป (เรียก scripts\run.py, มี auto-update)
+├── update.bat                # git pull + ติดตั้งซ้ำ
 ├── requirements.txt
 ├── .gitignore
+├── scripts/
+│   ├── install.py            # pip + ทดสอบโหลด Flet
+│   ├── run.py                # entry เปิด GUI
+│   └── _find_python.bat      # เลือก py -3 / python
 ├── app/
+│   ├── ssl_bundle.py         # ตั้งค่า SSL/certifi ก่อน Flet
 │   ├── config/               # บันทึก/โหลด settings (config.json)
 │   │   └── manager.py
 │   ├── theme/                # สี, gradient, widget helpers

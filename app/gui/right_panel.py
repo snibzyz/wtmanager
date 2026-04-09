@@ -30,6 +30,15 @@ def build_right_panel(
     clipboard_svc: ft.Clipboard | None = None,
 ) -> ft.Container:
 
+    def _safe_page_update() -> None:
+        """หลีกเลี่ยง crash ตอนปิดหน้าต่าง / ยกเลิกงาน — session ถูกทำลายแล้วแต่ finally ยังเรียก update."""
+        try:
+            page.update()
+        except RuntimeError as e:
+            if "destroyed session" in str(e).lower():
+                return
+            raise
+
     cfg = load_config()
 
     # ── Credit settings ──────────────────────────────────────────────────
@@ -58,7 +67,7 @@ def build_right_panel(
                     credit_paths_ref["value"].pop(i)
                     _save_cfg()
                     _rebuild_credit_list()
-                    page.update()
+                    _safe_page_update()
                 return _remove
             row = ft.Row(
                 [
@@ -114,7 +123,7 @@ def build_right_panel(
                     existing.add(c)
             _save_cfg()
             _rebuild_credit_list()
-            page.update()
+            _safe_page_update()
 
     credit_browse_btn.on_click = on_credit_browse
 
@@ -167,7 +176,7 @@ def build_right_panel(
         btn_jpg.style = fmt_style(fmt == "jpg")
         btn_png.style = fmt_style(fmt == "png")
         _save_cfg()
-        page.update()
+        _safe_page_update()
 
     compress_section = ft.Container(
         content=ft.Row(
@@ -273,7 +282,7 @@ def build_right_panel(
                     selected_funcs.discard("raw")
                 selected_funcs.add(key)
             _refresh_func_ui()
-            page.update()
+            _safe_page_update()
         return handler
 
     for key in FUNC_ORDER:
@@ -352,7 +361,7 @@ def build_right_panel(
     _log_batch_count: dict = {"n": 0}
 
     def _flush_progress_ui() -> None:
-        page.update()
+        _safe_page_update()
         _log_batch_count["n"] = 0
 
     def _progress_reset(total_files: int) -> None:
@@ -362,7 +371,7 @@ def build_right_panel(
         _progress_label.value = ""
         _log_list.controls.clear()
         _log_batch_count["n"] = 0
-        page.update()
+        _safe_page_update()
 
     def _progress_log(
         msg: str,
@@ -414,7 +423,7 @@ def build_right_panel(
         )
         _snackbar.bgcolor = CARD_BG
         _snackbar.open = True
-        page.update()
+        _safe_page_update()
 
     # ── Execute ──────────────────────────────────────────────────────────
     btn_execute = ft.ElevatedButton(
@@ -450,6 +459,7 @@ def build_right_panel(
         loop = asyncio.get_running_loop()
         ok_count = 0
         err_msg = None
+        cancelled = False
         agg = {
             "split_pieces": 0,
             "split_eps": 0,
@@ -613,7 +623,7 @@ def build_right_panel(
                             _progress_state["done"] = done
                             _progress_bar.value = done / total if total else 0
                             _progress_label.value = f"{done} / {total}  ({filename})"
-                            page.update()
+                            _safe_page_update()
 
                         _ui_threadsafe(_apply_prog)
 
@@ -633,6 +643,9 @@ def build_right_panel(
                 else:
                     _progress_log(f"  ✗ {story_name} มีข้อผิดพลาด", color="#EF4444", flush=True)
 
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
         except Exception as ex:
             err_msg = str(ex)
             _progress_log(f"ผิดพลาด: {ex}", color="#EF4444", flush=True)
@@ -640,7 +653,9 @@ def build_right_panel(
             _progress_done()
             btn_execute.disabled = False
             btn_execute.text = "Execute"
-            if err_msg:
+            if cancelled:
+                _safe_page_update()
+            elif err_msg:
                 _toast(f"ผิดพลาด: {err_msg}", error=True)
             else:
                 summary_lines = [
@@ -657,7 +672,6 @@ def build_right_panel(
                         f"(คัดลอกรวม {agg['cred_files_total']} ไฟล์)"
                     )
                 _toast("\n".join(summary_lines), long_duration=True)
-            page.update()
 
     def run_execute(e: ft.ControlEvent) -> None:
         parent = parent_path_ref["value"]
@@ -691,7 +705,7 @@ def build_right_panel(
         btn_execute.disabled = True
         btn_execute.text = "กำลังทำงาน..."
         _progress_reset(0)
-        page.update()
+        _safe_page_update()
 
         async def _run_job() -> None:
             await _do_execute_async(

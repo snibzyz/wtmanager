@@ -13,9 +13,11 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-APP_DIR = Path(__file__).resolve().parent
+APP_DIR = Path(__file__).resolve().parent.parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
+
+from app.ssl_bundle import apply_certifi_defaults
 
 
 def _auto_update() -> None:
@@ -50,6 +52,7 @@ def _auto_update() -> None:
 
 
 try:
+    apply_certifi_defaults()
     import flet as ft
     from app.gui.main import main
 
