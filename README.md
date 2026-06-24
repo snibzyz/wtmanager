@@ -16,20 +16,37 @@ Workspace collector สำหรับรวบรวมและจัดกา
 
 ---
 
-## เริ่มต้น (แนะนำ — clone จาก Git)
+## การติดตั้ง
 
-**ให้โค้ดตรงกับรีโปและมี auto-update** อย่าใช้แค่ดาวน์โหลด ZIP ถ้าไม่จำเป็น
+ทุกวิธีต้องมี [Python 3.10+](https://www.python.org/downloads/) ก่อน — ตอนติดตั้งติ๊ก **Add python.exe to PATH** และ **tcl/tk and IDLE**
 
-1. ติดตั้ง [Python 3.10+](https://www.python.org/downloads/) และ [Git for Windows](https://git-scm.com/download/win)  
-2. เปิด CMD / PowerShell แล้วรัน (แทน `<URL>` ด้วยลิงก์ clone จริงของรีโป):
+จากนั้นเลือกวิธีใดวิธีหนึ่ง:
+
+### วิธีที่ 1 — Git clone (แนะนำ ✅ มี auto-update)
+
+ได้โค้ดตรงรีโปและอัปเดตเองทุกครั้งที่เปิด ต้องมี [Git for Windows](https://git-scm.com/download/win) ก่อน
 
 ```text
-git clone <URL>
-cd <ชื่อโฟลเดอร์โปรเจกต์>
+git clone https://github.com/snibzyz/wtmanager.git
+cd wtmanager
 ```
 
-3. ดับเบิลคลิก **`install.bat`** (หรือจากโฟลเดอร์รีโป: `python scripts\install.py`) — จะติดตั้งแพ็กเกจและ **ทดสอบโหลด UI** ถ้าผ่านถือว่าพร้อมใช้  
-4. ดับเบิลคลิก **`run.bat`** (หรือ `python scripts\run.py`)
+แล้วดับเบิลคลิก **`install.bat`** → เปิดด้วย **`run.bat`**
+
+### วิธีที่ 2 — ดาวน์โหลดจาก Release (ไม่ต้องมี Git)
+
+1. เปิด **[หน้า Releases ล่าสุด](https://github.com/snibzyz/wtmanager/releases/latest)**
+2. ใต้หัวข้อ **Assets** กด **Source code (zip)** เพื่อดาวน์โหลด
+3. แตก ZIP แล้วเข้าโฟลเดอร์ที่ได้
+4. ดับเบิลคลิก **`install.bat`** → เปิดด้วย **`run.bat`**
+
+> ⚠️ วิธีนี้ **ไม่มี auto-update** (ไม่มี `.git`) — มีเวอร์ชันใหม่ต้องโหลด ZIP ใหม่เอง หรือเปลี่ยนไปใช้วิธีที่ 1
+
+### วิธีที่ 3 — ดาวน์โหลดโค้ดล่าสุด (ZIP)
+
+ที่หน้า repo กดปุ่มเขียว **`< > Code` → Download ZIP** (ได้โค้ดล่าสุดบนสาขา `master`) แล้วทำเหมือนวิธีที่ 2 ข้อ 3–4
+
+> ⚠️ เหมือนวิธีที่ 2 คือ **ไม่มี auto-update**
 
 ถ้า `install.bat` จบด้วยข้อความ **\[ตรวจสอบ\] พร้อมใช้งาน** แปลว่าติดตั้งสมบูรณ์แล้ว
 
@@ -37,7 +54,7 @@ cd <ชื่อโฟลเดอร์โปรเจกต์>
 
 ---
 
-## ติดตั้ง (เมื่อมีโฟลเดอร์โปรเจกต์อยู่แล้ว)
+## ติดตั้งซ้ำ (เมื่อมีโฟลเดอร์โปรเจกต์อยู่แล้ว)
 
 ดับเบิลคลิก `install.bat` หรือรัน:
 
@@ -55,12 +72,13 @@ python scripts\install.py
 python scripts\run.py
 ```
 
-## อัปเดตด้วยมือ
+## อัปเดต
 
-ดับเบิลคลิก **`update.bat`** — จะ `git pull --ff-only` แล้วรัน `scripts\install.py` อีกครั้ง
+**ถ้าติดตั้งด้วยวิธีที่ 1 (git clone):**
+- **Auto-update:** ทุกครั้งที่เปิดโปรแกรม (`run.bat`) จะ `git pull --ff-only` ให้ก่อน — ถ้าไม่มีเน็ต / ไม่มี git / pull ไม่สำเร็จ ก็ข้ามไปเปิดแอปได้ ไม่ค้าง
+- อัปเดตเองด้วยมือ: ดับเบิลคลิก **`update.bat`** (จะ `git pull --ff-only` แล้วรัน `scripts\install.py` ซ้ำ)
 
-> **Auto-update:** เมื่อโฟลเดอร์มาจาก `git clone` (มี `.git`) ทุกครั้งที่เปิดโปรแกรมจะ `git pull --ff-only` ก่อน  
-> ถ้าไม่มีเน็ต / ไม่มี git / pull ไม่สำเร็จ — ข้ามไปเปิดแอปได้ ไม่ค้าง
+**ถ้าติดตั้งด้วยวิธีที่ 2/3 (ZIP):** ไม่มี auto-update — เวลามีเวอร์ชันใหม่ให้โหลด ZIP ใหม่จาก [หน้า Releases](https://github.com/snibzyz/wtmanager/releases/latest) แล้วแตกทับ (config เดิมอยู่ในโฟลเดอร์ที่ติดตั้ง ไม่หาย ถ้าแตกคนละที่ให้ก๊อป `app/config/config.json` ตามไป)
 
 ---
 
