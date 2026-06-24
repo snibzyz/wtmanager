@@ -18,11 +18,22 @@ Workspace collector สำหรับรวบรวมและจัดกา
 
 ## การติดตั้ง
 
-ทุกวิธีต้องมี [Python 3.10+](https://www.python.org/downloads/) ก่อน — ตอนติดตั้งติ๊ก **Add python.exe to PATH** และ **tcl/tk and IDLE**
+### วิธีที่ 0 — ดาวน์โหลด `.exe` (ง่ายสุด ✅ ไม่ต้องลง Python/Git)
 
-จากนั้นเลือกวิธีใดวิธีหนึ่ง:
+1. โหลด **`WTManager.exe`** จาก **[หน้า Releases ล่าสุด](https://github.com/snibzyz/wtmanager/releases/latest)** (ใต้หัวข้อ **Assets**)
+2. ดับเบิลคลิกเปิดได้เลย — ไฟล์เดียวจบ ไม่ต้องติดตั้งอะไร
+3. **อัปเดตเอง:** เปิดทุกครั้งจะเช็ค Releases ถ้ามีเวอร์ชันใหม่จะโหลด + สลับ + เปิดใหม่ให้อัตโนมัติ
 
-### วิธีที่ 1 — Git clone (แนะนำ ✅ มี auto-update)
+> - ตั้งค่า (workspace/ฟังก์ชันล่าสุด) เก็บที่ `%LOCALAPPDATA%\WTManager\config.json` → อัปเดต `.exe` แล้วค่าไม่หาย
+> - ครั้งแรก Windows SmartScreen อาจเตือน (ไฟล์ใหม่ ยังไม่ได้เซ็น) → กด **More info → Run anyway**
+
+---
+
+### รันจาก source (ต้องมี Python 3.10+)
+
+ตอนติดตั้ง [Python 3.10+](https://www.python.org/downloads/) ติ๊ก **Add python.exe to PATH** และ **tcl/tk and IDLE** แล้วเลือกวิธีใดวิธีหนึ่ง:
+
+#### วิธีที่ 1 — Git clone (แนะนำ ✅ มี auto-update)
 
 ได้โค้ดตรงรีโปและอัปเดตเองทุกครั้งที่เปิด ต้องมี [Git for Windows](https://git-scm.com/download/win) ก่อน
 
@@ -33,7 +44,7 @@ cd wtmanager
 
 แล้วดับเบิลคลิก **`install.bat`** → เปิดด้วย **`run.bat`**
 
-### วิธีที่ 2 — ดาวน์โหลดจาก Release (ไม่ต้องมี Git)
+#### วิธีที่ 2 — ดาวน์โหลด source จาก Release (ไม่ต้องมี Git)
 
 1. เปิด **[หน้า Releases ล่าสุด](https://github.com/snibzyz/wtmanager/releases/latest)**
 2. ใต้หัวข้อ **Assets** กด **Source code (zip)** เพื่อดาวน์โหลด
@@ -42,7 +53,7 @@ cd wtmanager
 
 > ⚠️ วิธีนี้ **ไม่มี auto-update** (ไม่มี `.git`) — มีเวอร์ชันใหม่ต้องโหลด ZIP ใหม่เอง หรือเปลี่ยนไปใช้วิธีที่ 1
 
-### วิธีที่ 3 — ดาวน์โหลดโค้ดล่าสุด (ZIP)
+#### วิธีที่ 3 — ดาวน์โหลดโค้ดล่าสุด (ZIP)
 
 ที่หน้า repo กดปุ่มเขียว **`< > Code` → Download ZIP** (ได้โค้ดล่าสุดบนสาขา `master`) แล้วทำเหมือนวิธีที่ 2 ข้อ 3–4
 
@@ -73,6 +84,8 @@ python scripts\run.py
 ```
 
 ## อัปเดต
+
+**ถ้าใช้ `.exe` (วิธีที่ 0):** อัปเดตอัตโนมัติ — เปิดทุกครั้งจะเช็ค Releases ให้เอง ถ้ามีเวอร์ชันใหม่จะโหลด + เปิดใหม่ทันที
 
 **ถ้าติดตั้งด้วยวิธีที่ 1 (git clone):**
 - **Auto-update:** ทุกครั้งที่เปิดโปรแกรม (`run.bat`) จะ `git pull --ff-only` ให้ก่อน — ถ้าไม่มีเน็ต / ไม่มี git / pull ไม่สำเร็จ ก็ข้ามไปเปิดแอปได้ ไม่ค้าง

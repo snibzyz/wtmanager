@@ -1,12 +1,31 @@
 """Config persistence - load/save app settings to config.json."""
 
 import json
+import os
+import sys
 from pathlib import Path
 
 from app.paths import canonical_dir
 
-_CONFIG_DIR = Path(__file__).resolve().parent
-_CONFIG_FILE = _CONFIG_DIR / "config.json"
+
+def _resolve_config_file() -> Path:
+    """ที่เก็บ config.
+
+    - .exe (frozen): %LOCALAPPDATA%\\WTManager\\config.json — เพราะ onefile แตกไฟล์
+      ลงโฟลเดอร์ temp ที่ถูกลบทุกครั้งที่ปิด ถ้าเก็บข้างโค้ดในนั้นค่าจะหาย.
+    - รันจาก source: เก็บข้าง ๆ โมดูลเหมือนเดิม (app/config/config.json).
+    """
+    if getattr(sys, "frozen", False):
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "WTManager"
+        try:
+            base.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            base = Path(__file__).resolve().parent
+        return base / "config.json"
+    return Path(__file__).resolve().parent / "config.json"
+
+
+_CONFIG_FILE = _resolve_config_file()
 
 DEFAULTS = {
     "last_workspace": "",
