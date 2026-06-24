@@ -7,9 +7,12 @@ Workspace collector สำหรับรวบรวมและจัดกา
 
 ## ความต้องการ
 
-- **Python 3.10+** (แนะนำติ๊ก Add to PATH ตอนติดตั้ง)
+- **Python 3.10+** (ตอนติดตั้ง แนะนำติ๊ก **Add to PATH** และ **tcl/tk and IDLE**)
 - **Git** (สำหรับ clone + auto-update)
-- แพ็กเกจใน `requirements.txt`: **Flet**, **Pillow**, **certifi** (ลดปัญหา SSL บน Windows ตอนโหลด Flet ครั้งแรก)
+- แพ็กเกจใน `requirements.txt`: **CustomTkinter**, **Pillow**
+
+> UI อยู่บน **Tkinter** ที่ติดมากับตัวติดตั้ง Python อยู่แล้ว → ไม่ต้องดาวน์โหลด
+> engine ตอนรัน ไม่มีปัญหา SSL/เน็ต และทำงานได้เหมือนกันทุกเครื่อง
 
 ---
 
@@ -25,7 +28,7 @@ git clone <URL>
 cd <ชื่อโฟลเดอร์โปรเจกต์>
 ```
 
-3. ดับเบิลคลิก **`install.bat`** (หรือจากโฟลเดอร์รีโป: `python scripts\install.py`) — จะติดตั้งแพ็กเกจและ **ทดสอบโหลด Flet ครั้งแรก** ถ้าผ่านถือว่าพร้อมใช้  
+3. ดับเบิลคลิก **`install.bat`** (หรือจากโฟลเดอร์รีโป: `python scripts\install.py`) — จะติดตั้งแพ็กเกจและ **ทดสอบโหลด UI** ถ้าผ่านถือว่าพร้อมใช้  
 4. ดับเบิลคลิก **`run.bat`** (หรือ `python scripts\run.py`)
 
 ถ้า `install.bat` จบด้วยข้อความ **\[ตรวจสอบ\] พร้อมใช้งาน** แปลว่าติดตั้งสมบูรณ์แล้ว
@@ -87,9 +90,8 @@ python scripts\run.py
 
 ### กฎการเลือก
 
-- **raw** กับ **res** เลือกได้อย่างใดอย่างหนึ่ง (mutually exclusive)
-- **inp** ต้องเลือก `raw` ก่อน
-- **split** และ **com** ต้องเลือก `res` ก่อน
+- **raw / inp / res** เลือกอิสระแยกกันได้ทุกอัน (จะเลือกพร้อมกันกี่อย่างก็ได้)
+- **split** และ **com** ต้องเลือก `res` ก่อน (ทำงานบนไฟล์ผลลัพธ์)
 - **ep** ต้องเลือก `trans` หรือ `text` ก่อน
 
 ### ชื่อโฟลเดอร์ output
@@ -174,37 +176,26 @@ WTManager/
 ├── install.bat               # ติดตั้ง (เรียก scripts\install.py)
 ├── run.bat                   # เปิดแอป (เรียก scripts\run.py, มี auto-update)
 ├── update.bat                # git pull + ติดตั้งซ้ำ
-├── requirements.txt
+├── requirements.txt          # customtkinter, Pillow
 ├── .gitignore
 ├── scripts/
-│   ├── install.py            # pip + ทดสอบโหลด Flet
-│   ├── run.py                # entry เปิด GUI
+│   ├── install.py            # pip + ทดสอบโหลด UI (offline)
+│   ├── run.py                # entry: auto-update (git pull) + เปิด GUI
 │   └── _find_python.bat      # เลือก py -3 / python
 ├── app/
-│   ├── ssl_bundle.py         # ตั้งค่า SSL/certifi ก่อน Flet
+│   ├── __init__.py           # __version__
+│   ├── paths.py              # normalize path ให้ทุกเครื่องอ่านตรงกัน
 │   ├── config/               # บันทึก/โหลด settings (config.json)
-│   │   └── manager.py
-│   ├── theme/                # สี, gradient, widget helpers
-│   │   ├── colors.py
-│   │   └── widgets.py
 │   ├── workspace/            # จัดการ workspace path
-│   │   └── manager.py
-│   ├── collectors/           # แต่ละไฟล์ = 1 หน้าที่
-│   │   ├── raw.py
-│   │   ├── inpainted.py
-│   │   ├── res.py
-│   │   ├── trans.py
-│   │   ├── text.py
-│   │   ├── split.py
-│   │   ├── credit.py         # post-process: เพิ่มเครดิต (รองรับหลายไฟล์)
-│   │   └── compress.py       # post-process: compress ภาพ
-│   └── gui/                  # UI components
-│       ├── main.py           # ประกอบหน้าหลัก
-│       ├── constants.py      # FUNC_ORDER, FUNC_LABELS, build_folder_name
-│       ├── styles.py         # chip styles
-│       ├── header.py
-│       ├── left_panel.py     # เลือก workspace + เรื่อง
-│       └── right_panel.py    # ฟังก์ชัน, ตั้งค่า, execute, log
+│   ├── collectors/           # แต่ละไฟล์ = 1 หน้าที่ (raw, inpainted, res,
+│   │                         #   trans, text, split, credit, compress)
+│   └── gui_ctk/              # UI (CustomTkinter)
+│       ├── app.py            # หน้าหลัก + execute (thread + queue)
+│       ├── theme.py          # สี + ฟอนต์
+│       ├── widgets.py        # การ์ด + หัวข้อ section
+│       ├── icons.py          # ไอคอน Segoe MDL2 Assets
+│       └── constants.py      # FUNC_ORDER, FUNC_LABELS, build_folder_name
+└── .old/                     # UI เดิม (Flet) เก็บไว้อ้างอิง — ไม่ใช้แล้ว
 ```
 
 ---

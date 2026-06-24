@@ -1,13 +1,8 @@
-"""WTManager - Workspace Collector (CustomTkinter UI).
+"""WTManager - Workspace Collector"""
 
-เวอร์ชัน UI ใหม่: ใช้ Tkinter/CustomTkinter ที่ติดมากับ Python มาตรฐาน
-→ ไม่ต้องโหลด engine ตอนรัน ไม่มี SSL ไม่มี API พังข้ามเวอร์ชัน.
-Logic เดิม (collectors/config/workspace) ใช้ร่วมกับเวอร์ชัน Flet ไม่แตะ.
-"""
-
+import sys
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -22,21 +17,27 @@ APP_DIR = Path(__file__).resolve().parent.parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
+from app.ssl_bundle import apply_certifi_defaults
+
 
 def _auto_update() -> None:
-    """ดึงอัปเดตล่าสุดจาก GitHub ก่อนเปิดแอป (ข้ามได้ถ้าไม่มีเน็ต/ไม่มี git)."""
-    if not (APP_DIR / ".git").exists():
+    """ดึงอัปเดตล่าสุดจาก GitHub ก่อนเปิดแอปทุกครั้ง"""
+    git_dir = APP_DIR / ".git"
+    if not git_dir.exists():
         print("[update] ไม่พบ .git — ข้ามการอัปเดต")
         return
     print("[update] กำลังตรวจสอบอัปเดต...")
     try:
         result = subprocess.run(
             ["git", "pull", "--ff-only"],
-            cwd=str(APP_DIR), capture_output=True, text=True, timeout=15,
+            cwd=str(APP_DIR),
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         msg = (result.stdout + result.stderr).strip()
         if result.returncode == 0:
-            if "up to date" in msg.lower():
+            if "Already up to date" in msg or "up to date" in msg.lower():
                 print("[update] โปรแกรมเป็นเวอร์ชันล่าสุดแล้ว")
             else:
                 print(f"[update] อัปเดตสำเร็จ:\n{msg}")
@@ -51,13 +52,13 @@ def _auto_update() -> None:
 
 
 try:
-    from app.gui_ctk import run
+    apply_certifi_defaults()
+    import flet as ft
+    from app.gui.main import main
 
     if __name__ == "__main__":
         _auto_update()
-        run()
+        ft.run(main)
 except Exception as ex:
     print(f"\n=== ERROR ===\n{ex}\n")
-    import traceback
-    traceback.print_exc()
     input("Press Enter to close...")

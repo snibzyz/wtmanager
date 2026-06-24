@@ -1,3 +1,3 @@
-flet>=0.24.0
+# UI: CustomTkinter (อยู่บน Tkinter ที่ติดมากับ Python — ไม่โหลด engine ตอนรัน)
+customtkinter>=5.2.0
 Pillow>=10.0.0
-certifi>=2024.2.2

@@ -1,4 +1,8 @@
-"""Install dependencies from requirements.txt."""
+"""Install dependencies from requirements.txt and verify the UI stack.
+
+UI ใหม่ใช้ CustomTkinter (อยู่บน Tkinter ที่ติดมากับ Python) → ไม่ต้องโหลด
+engine ตอนติดตั้ง ไม่ต้องต่อเน็ต ไม่มี SSL ให้พลาด.
+"""
 
 import subprocess
 import sys
@@ -17,56 +21,58 @@ def _ensure_root_on_path() -> None:
 def _warn_if_not_git_repo() -> None:
     if (ROOT / ".git").is_dir():
         return
+    print("\n[คำเตือน] ไม่พบโฟลเดอร์ .git — น่าจะไม่ได้ clone จาก Git", flush=True)
     print(
-        "\n[คำเตือน] ไม่พบโฟลเดอร์ .git — น่าจะไม่ได้ clone จาก Git",
+        "  แนะนำ: git clone <URL-รีโป> แล้วรัน install.bat ในโฟลเดอร์นั้น "
+        "— จะได้ auto-update (git pull) ตอนเปิดแอป",
         flush=True,
     )
-    print(
-        "  แนะนำ: git clone <URL-รีโป> แล้วรัน install.bat ในโฟลเดอร์นั้น — จะได้ auto-update (git pull)",
-        flush=True,
-    )
-    print(
-        "  ถ้าแตกไฟล์ ZIP อย่างเดียว แอปยังเปิดได้ แต่จะไม่ดึงอัปเดตอัตโนมัติ\n",
-        flush=True,
-    )
+    print("  ถ้าแตกไฟล์ ZIP อย่างเดียว แอปยังเปิดได้ แต่จะไม่ดึงอัปเดตอัตโนมัติ\n", flush=True)
 
 
-def _verify_can_import_app_stack() -> int:
-    """โหลด Flet ครั้งแรกตอน install เพื่อจับ SSL/เน็ตก่อนผู้ใช้รัน run.bat"""
+def _verify_stack() -> int:
+    """ตรวจว่าโหลด UI stack ได้ครบ (offline ล้วน ไม่ต่อเน็ต)."""
     _ensure_root_on_path()
-    from app.ssl_bundle import apply_certifi_defaults
-
-    apply_certifi_defaults()
-    print(
-        "กำลังตรวจสอบว่าโหลด Flet ได้ (ครั้งแรกอาจดาวน์โหลด ใช้เวลาสักครู่)...",
-        flush=True,
-    )
+    print("กำลังตรวจสอบว่าโหลด UI ได้...", flush=True)
+    missing = []
     try:
-        import certifi  # noqa: F401
-        from PIL import Image  # noqa: F401
-        import flet  # noqa: F401
+        import tkinter  # noqa: F401  (ติดมากับ Python มาตรฐาน)
+    except Exception:
+        missing.append(
+            "tkinter — ติดตั้ง Python จาก python.org แล้วติ๊ก 'tcl/tk and IDLE' "
+            "(หรือบน Linux: sudo apt install python3-tk)"
+        )
+    try:
+        import customtkinter  # noqa: F401
     except Exception as e:
-        print(
-            "\n[ผิดพลาด] ติดตั้งแพ็กเกจแล้ว แต่โหลด Flet / ภาพ / SSL ไม่สำเร็จ",
-            flush=True,
-        )
-        print(f"  รายละเอียด: {e}", flush=True)
-        print(
-            "  ลอง: ตรวจเน็ตและไฟร์วอลล์, อัปเดต pip, หรือถ้าเป็นเน็ตองค์กรให้ใส่ CA ของบริษัท",
-            flush=True,
-        )
+        missing.append(f"customtkinter ({e})")
+    try:
+        from PIL import Image  # noqa: F401
+    except Exception as e:
+        missing.append(f"Pillow ({e})")
+
+    if missing:
+        print("\n[ผิดพลาด] ยังโหลดไม่ครบ:", flush=True)
+        for m in missing:
+            print(f"  - {m}", flush=True)
         return 1
-    print(
-        "\n[ตรวจสอบ] พร้อมใช้งาน — เปิดด้วย run.bat ได้เลย",
-        flush=True,
-    )
+
+    # ลอง import ตัวแอปจริง เพื่อจับ error ตั้งแต่ตอนติดตั้ง
+    try:
+        import app.gui_ctk  # noqa: F401
+    except Exception as e:
+        print(f"\n[ผิดพลาด] โหลดโมดูลแอปไม่สำเร็จ: {e}", flush=True)
+        return 1
+
+    print("\n[ตรวจสอบ] พร้อมใช้งาน — เปิดด้วย run.bat ได้เลย", flush=True)
     return 0
 
 
 def main() -> int:
     if sys.version_info < MIN_PY:
         print(
-            f"ต้องการ Python {MIN_PY[0]}.{MIN_PY[1]}+ (ตอนนี้เป็น {sys.version_info.major}.{sys.version_info.minor})"
+            f"ต้องการ Python {MIN_PY[0]}.{MIN_PY[1]}+ "
+            f"(ตอนนี้เป็น {sys.version_info.major}.{sys.version_info.minor})"
         )
         print("ดาวน์โหลด: https://www.python.org/downloads/ — ติ๊ก Add python.exe to PATH")
         return 1
@@ -87,7 +93,7 @@ def main() -> int:
         return 1
     print("\nติดตั้งแพ็กเกจจาก requirements.txt เรียบร้อยแล้ว", flush=True)
     _warn_if_not_git_repo()
-    return _verify_can_import_app_stack()
+    return _verify_stack()
 
 
 if __name__ == "__main__":
